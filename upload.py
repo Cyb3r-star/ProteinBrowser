@@ -3,9 +3,9 @@ import xlrd
 import sqlite3 as sql
 
 #Prompting the user for input for Excel file, sheet, database, and some experiment data
-filename = input("Enter the name of the Excel file to parse: ")
+filename = input("Enter the name of the Excel file to parse: (postfix with .xlsx)")
 sheetname = input("Enter the name of the sheet to parse: ")
-database_name = input("Enter the name of the database to which you want to upload data: ")
+database_name = input("Enter the name of the database to which you want to upload data: (postfix with .db)")
 exp_name = input("Enter the experiment name: ")
 ctrl = input("Enter the control name: ")
 mut = input("Enter the mutant name: ")
@@ -62,7 +62,7 @@ for row_count in range(3, 62):
     row_count += 1
 
 #Uploading spreadsheet data to a SQLite database
-conn = sql.connect("{}.db".format(database_name))
+conn = sql.connect("{}".format(database_name))
 curr = conn.cursor()
 
 for i in proteins:
