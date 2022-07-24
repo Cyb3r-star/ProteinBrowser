@@ -2,7 +2,7 @@
 import sqlite3 as sql
 
 #Asking the user for a database name (check for format?)
-database_name = input("Enter the name of the database to create: (postfix with .db)")
+database_name = input("Enter the name of the database to create: (postfix with .db) ")
 
 #Initialising a SQLite database using the sqlite3 module and the cursor object
 conn = sql.connect("{}".format(database_name))

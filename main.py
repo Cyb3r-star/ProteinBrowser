@@ -17,7 +17,7 @@ while True:
     elif choice == 4:
         os.system("ls *.db")
     elif choice == 5:
-        dbname = input("Enter the database to delete: ")
+        dbname = input("Enter the database to delete: (postfix with .db) ")
         length = len(dbname)
         ext = dbname[-3:-1] + dbname[-1]
 

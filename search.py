@@ -2,7 +2,7 @@
 import sqlite3 as sql
 
 #Prompting the user for a database name
-database_name = input("Enter the database you wish to search: (postfix with a .db)")
+database_name = input("Enter the database you wish to search: (postfix with a .db) ")
 
 #Connecting to a SQLite database using sqlite3
 conn = sql.connect("{}".format(database_name))
