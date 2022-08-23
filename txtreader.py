@@ -4,6 +4,7 @@ import numpy as np
 import statistics as stats
 import math
 import os
+import re
 
 print("""  _                        _
  |_) ._ _ _|_  _  o ._    |_) ._ _        _  _  ._
@@ -53,8 +54,27 @@ text_stripped = text.replace('"','')
 sheet2 = open(filename, "w")
 sheet2.write(text_stripped)
 sheet2.close()
+
+sheet3 = open(filename, "r")
+content = sheet3.readlines()
+sheet3.close()
+
+head = content[0]
+head = head.replace('Protein FDR Confidence: Combined', 'Protein_FDR')
+head = head.replace('Score Sequest HT: Sequest HT', 'Score_Sequest')
+head = head.replace('# Peptides', 'Peptides')
+head = head.replace('MW [kDa]', 'MW')
+head = head.replace('# PSMs', 'PSMs')
+abund_count = head.count("Abundance Ratio")
+header = re.sub('Abundance Ratio \(log2\): \(F\d, Light\) / \(F\d, Heavy\)\s', '', head)
+for i in range(abund_count):
+    header = header + "Abundance" + str(i+1) + "\t"
+header = header.replace("\t",", ")
+print(header)
+
+
 #program throws an error when [], #, are present within the header - square brackets must be escaped as they are used for list declaration and cannot be used inside a list.
-header = "Proteins Unique Sequence ID, Protein FDR Confidence: Combined, Score Sequest HT: Sequest HT, Accession, Description, MW, Peptides, PSMs, Abundance1, Abundance2, Abundance3, Abundance4"
+#header = "Proteins Unique Sequence ID, Protein FDR Confidence: Combined, Score Sequest HT: Sequest HT, Accession, Description, MW, Peptides, PSMs, Abundance1, Abundance2, Abundance3, Abundance4"
 
 accession_data = np.genfromtxt(filename, skip_header=1, names=header, delimiter="\t", usecols=("Accession"), encoding=None, dtype=None)
 description_data = np.genfromtxt(filename, skip_header=1, names=header, delimiter="\t", usecols=("Description"), encoding=None, dtype=None)
@@ -132,7 +152,10 @@ class Protein:
     def std_error(self):
         self.n = self.N()
         self.dev = self.std_dev()
-        return (self.dev / math.sqrt(self.n))
+        if self.n != 0:
+            return (self.dev / math.sqrt(self.n))
+        else:
+            return 0
 
     '''def round(self):
         self.round_raw = []
@@ -168,7 +191,7 @@ class Protein:
             self.round_corr.append(round(i,2))
         self.str_rraw_concat = str(self.round_raw)
         self.str_rraw = self.str_rraw_concat.replace(',','\t')
-        self.rcorr = self.ratios_corrected
+        self.rcorr = self.ratios_corrected #RuntimeWarning: invalid value encountered in true_divide
         self.str_rcorr_concat = str(self.round_corr)
         self.str_rcorr = self.str_rcorr_concat.replace(',','\t')
         if np.isnan(self.avg()) == False:
@@ -200,27 +223,37 @@ for i in range(num_rows):
     PSMs = psm_data[i]
     ratios_raw = ratio_data[i]
 
-    proteins.append(Protein(accession, description, mw, peptides, PSMs, ratios_raw))
+    proteins.append(Protein(accession, description, mw, peptides, PSMs, ratios_raw)) #RuntimeWarning: invalid value encountered in double_scalars
 
 for i in proteins:
     i.correction()
     #i.round()
-    i.display()
+    #i.display()
 
-print("Reading data from file {} ...".format(filename))
+print("Reading data from file {} ...".format(filename)) #RuntimeWarning: Degrees of freedom <= 0 for slice
 
 print("Median ratio values for raw data: {}".format(medians))
 print("Number of valid repeats in each column: {}".format(lens))
 
 print("Output data saved to {}".format(output_name))
 
+out_head = "Accession\tDescription\tMW\tPSMs\tPeptides\tAverage\tStandard deviation\tStandard error\t"
+for i in range(4):
+    new_str = "Raw ratio" + str(i + 1) + "\t"
+    out_head += new_str
+
+for i in range(4):
+    new_str = "Corrected ratio" + str(i + 1) + "\t"
+    out_head += new_str
+
 handle = open(output_name, 'w')
+handle.write(out_head)
+handle.write("\n")
 for i in proteins:
     handle.write(i.strformat())
     handle.write("\n")
 
 #Print out median correction value?
-#Implement std/serror calculation
 #Print the header line into output files
 #Print out avg, stddev, stderror, 3-letter name
 #CLI tool
