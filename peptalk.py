@@ -1,27 +1,38 @@
 #txtreader.py
-import sys
+import sys, math, os, re
 import numpy as np
 import statistics as stats
-import math
-import os
 
-print("""  _                        _
- |_) ._ _ _|_  _  o ._    |_) ._ _        _  _  ._
- |   | (_) |_ (/_ | | |   |_) | (_) \/\/ _> (/_ |
-                                                     """)
+print("""
+███████████                     ███████████           ████  █████
+░░███░░░░░███                   ░█░░░███░░░█          ░░███ ░░███
+ ░███    ░███  ██████  ████████ ░   ░███  ░   ██████   ░███  ░███ █████
+ ░██████████  ███░░███░░███░░███    ░███     ░░░░░███  ░███  ░███░░███
+ ░███░░░░░░  ░███████  ░███ ░███    ░███      ███████  ░███  ░██████░
+ ░███        ░███░░░   ░███ ░███    ░███     ███░░███  ░███  ░███░░███
+ █████       ░░██████  ░███████     █████   ░░████████ █████ ████ █████
+░░░░░         ░░░░░░   ░███░░░     ░░░░░     ░░░░░░░░ ░░░░░ ░░░░ ░░░░░
+                       ░███
+                       █████
+                      ░░░░░                                            \n""")
+print("""\n* * * * * * * * A PEPTIDE MASS-SPEC DATA ANALYSIS TOOL * * * * * * * *\n""")
 
+#Reading in command-line arguments into a list
 argument_list = sys.argv[1:]
 
+#Setting default values (to throw errors if user does not provide input/output file name)
 filename = "0"
 output_name = "0"
 
+#Parsing command-line arguments and searching for predefined flags
 try:
     for arg in argument_list:
         if arg in ("-h"):
             print("\nUsage: peptalk [option] -i [input file] -o [output file] -p [JSON params file]")
-            print("\nOptions and arguments: \n-h\t: print the usage manual\n-i\t: name of the input file (currently tab-delimited text only)\n-o\t: name of the output file\n-p\t: path to a JSON custom analysis parameters file\n-v\t: verbose output\n-c\t: parse a cysteine reactivity file")
+            print("""\nOptions and arguments: \n-h\t: print the usage manual\n-i\t: name of the input file (currently tab-delimited text only)\n-o\t: name of the output file\n-p\t: path to a JSON custom analysis parameters file\n-v\t: verbose output\n-c\t: parse a cysteine reactivity file""")
             quit()
         if arg in ("-o"):
+            #Searching for filename (next item after the flag)
             for i in range(len(argument_list)):
                 if argument_list[i] == "-o":
                     output_name = argument_list[i+1]
@@ -32,6 +43,7 @@ try:
         #elif curr_arg in ("-p"):
         #elif curr_arg in ("-v"):
         #elif curr_arg in ("-c"):
+#Throwing exceptions
 except:
     print("Could not load arguments")
     quit()
@@ -44,18 +56,38 @@ if output_name == "0":
     print("\nOutput file name not provided\n")
     quit()
 
+#Opening the provided text file and extracting the text
 sheet = open(filename, "r")
 text = sheet.read()
+sheet.close()
 
-proteins = []
-
+#Stripping the text of the redundant quotation marks and writing the processed text into original file
 text_stripped = text.replace('"','')
 sheet2 = open(filename, "w")
 sheet2.write(text_stripped)
 sheet2.close()
-#program throws an error when [], #, are present within the header - square brackets must be escaped as they are used for list declaration and cannot be used inside a list.
-header = "Proteins Unique Sequence ID, Protein FDR Confidence: Combined, Score Sequest HT: Sequest HT, Accession, Description, MW, Peptides, PSMs, Abundance1, Abundance2, Abundance3, Abundance4"
 
+#Loading the processed text
+sheet3 = open(filename, "r")
+content = sheet3.readlines()
+sheet3.close()
+
+#Extracting and sanitizing the header line (removing special characters not parsable by genfromtxt)
+head = content[0]
+head = head.replace('Protein FDR Confidence: Combined', 'Protein_FDR')
+head = head.replace('Score Sequest HT: Sequest HT', 'Score_Sequest')
+head = head.replace('# Peptides', 'Peptides')
+head = head.replace('MW [kDa]', 'MW')
+head = head.replace('# PSMs', 'PSMs')
+
+#Determining number of abundance ratio values, removing original column names (contain non-parsable characters), appending a necessary number of ratio column names, and changing the delimiters to commas (for processing by genfromtxt)
+abund_count = head.count("Abundance Ratio")
+header = re.sub('Abundance Ratio \(log2\): \(F\d, Light\) / \(F\d, Heavy\)\s', '', head)
+for i in range(abund_count):
+    header = header + "Abundance" + str(i+1) + "\t"
+header = header.replace("\t",", ")
+
+#Extracting columns of interest from the text file using genfromtxt
 accession_data = np.genfromtxt(filename, skip_header=1, names=header, delimiter="\t", usecols=("Accession"), encoding=None, dtype=None)
 description_data = np.genfromtxt(filename, skip_header=1, names=header, delimiter="\t", usecols=("Description"), encoding=None, dtype=None)
 mw_data = np.genfromtxt(filename, skip_header=1, names=header, delimiter="\t", usecols=("MW"), encoding=None, dtype=None)
@@ -75,6 +107,8 @@ for i in range(len(ratio_data[0])):
     medians.append(stats.median(arr))
     lens.append(counter)
 #Could nans be messing up the data?
+
+proteins = []
 
 class Protein:
     def __init__(self, accession, description, mw, peptides, PSMs, ratios_raw):
@@ -132,7 +166,10 @@ class Protein:
     def std_error(self):
         self.n = self.N()
         self.dev = self.std_dev()
-        return (self.dev / math.sqrt(self.n))
+        if self.n != 0:
+            return (self.dev / math.sqrt(self.n))
+        else:
+            return 0
 
     '''def round(self):
         self.round_raw = []
@@ -168,22 +205,22 @@ class Protein:
             self.round_corr.append(round(i,2))
         self.str_rraw_concat = str(self.round_raw)
         self.str_rraw = self.str_rraw_concat.replace(',','\t')
-        self.rcorr = self.ratios_corrected
+        self.rcorr = self.ratios_corrected #RuntimeWarning: invalid value encountered in true_divide
         self.str_rcorr_concat = str(self.round_corr)
         self.str_rcorr = self.str_rcorr_concat.replace(',','\t')
         if np.isnan(self.avg()) == False:
-            self.avg_val = str(round(self.avg()))
+            self.avg_val = str(round(self.avg(),2))
         else:
             self.avg_val = str(self.avg())
         if np.isnan(self.std_dev()) == False:
-            self.std_dev_val = str(round(self.std_dev()))
+            self.std_dev_val = str(round(self.std_dev(),2))
         else:
             self.std_dev_val = str(self.std_dev())
         if np.isnan(self.std_error()) == False:
-            self.std_error_val = str(round(self.std_error()))
+            self.std_error_val = str(round(self.std_error(),2))
         else:
             self.std_error_val = str(self.std_error())
-        ls = [str(self.accession[0]), str(self.description[0]), str(round(self.mw[0])), str(self.PSMs[0]), str(self.peptides[0]), self.avg_val, self.std_dev_val, self.std_error_val]
+        ls = [str(self.accession[0]), str(self.description[0]), str(round(self.mw[0],2)), str(self.PSMs[0]), str(self.peptides[0]), self.avg_val, self.std_dev_val, self.std_error_val]
         ls.append(self.str_rraw)
         ls.append(self.str_rcorr)
         string = "\t".join(ls)
@@ -200,27 +237,37 @@ for i in range(num_rows):
     PSMs = psm_data[i]
     ratios_raw = ratio_data[i]
 
-    proteins.append(Protein(accession, description, mw, peptides, PSMs, ratios_raw))
+    proteins.append(Protein(accession, description, mw, peptides, PSMs, ratios_raw)) #RuntimeWarning: invalid value encountered in double_scalars
 
 for i in proteins:
     i.correction()
     #i.round()
-    i.display()
+    #i.display()
 
-print("Reading data from file {} ...".format(filename))
+print("Reading data from file {} ...".format(filename)) #RuntimeWarning: Degrees of freedom <= 0 for slice
 
 print("Median ratio values for raw data: {}".format(medians))
 print("Number of valid repeats in each column: {}".format(lens))
 
 print("Output data saved to {}".format(output_name))
 
+out_head = "Accession\tDescription\tMW [kDa]\t# PSMs\t# Peptides\tAverage\tStandard deviation\tStandard error\t"
+for i in range(4):
+    new_str = "Abundance Ratio (raw, log2): (F" + str(i + 1) + ", Light) / (F" + str(i + 1) +", Heavy)\t"
+    out_head += new_str
+
+for i in range(4):
+    new_str = "Abundance Ratio (corrected, log2): (F" + str(i + 1) + ", Light) / (F" + str(i + 1) +", Heavy)\t"
+    out_head += new_str
+
 handle = open(output_name, 'w')
+handle.write(out_head)
+handle.write("\n")
 for i in proteins:
     handle.write(i.strformat())
     handle.write("\n")
 
 #Print out median correction value?
-#Implement std/serror calculation
 #Print the header line into output files
 #Print out avg, stddev, stderror, 3-letter name
 #CLI tool
